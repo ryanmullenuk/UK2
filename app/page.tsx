@@ -1,5 +1,3 @@
-"use client";
-
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { UK_GRID_HEIGHT, UK_GRID_WIDTH, UK_MASK_PACKED } from "./generated-uk-mask";
 

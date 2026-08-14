@@ -18,8 +18,8 @@ An interactive digital map of the United Kingdom made from exactly 10,000 indivi
 You need Node.js 22 or newer.
 
 ```bash
-npm install
-npm run dev
+pnpm install
+pnpm run dev
 ```
 
 Open the local address shown in the terminal.
@@ -27,12 +27,14 @@ Open the local address shown in the terminal.
 ## Production build
 
 ```bash
-npm run build
+pnpm run build
 ```
 
 ## Deployment
 
-The repository includes a GitHub Actions workflow for GitHub Pages. In the repository settings, set **Pages → Build and deployment → Source** to **GitHub Actions**. Each push to `main` then publishes the latest version.
+The site is a static React application hosted entirely by GitHub Pages. It has no sign-in, ChatGPT hosting or external application layer.
+
+The repository includes a GitHub Actions workflow for GitHub Pages. In the repository settings, set **Pages → Build and deployment → Source** to **GitHub Actions**. Each push to `main` then publishes the latest version at [ryanmullenuk.github.io/UK2](https://ryanmullenuk.github.io/UK2/).
 
 ## Connecting the live purchase flow
 
@@ -53,7 +55,7 @@ The map mask is generated from the [ONS UK TopoJSON dataset](https://github.com/
 To regenerate the checked-in mask from the source geography:
 
 ```bash
-npm run map:generate
+pnpm run map:generate
 ```
 
 Source: Office for National Statistics licensed under the Open Government Licence v3.0. Contains OS data © Crown copyright and database right.
