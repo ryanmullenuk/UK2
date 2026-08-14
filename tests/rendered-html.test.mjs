@@ -28,9 +28,12 @@ test("keeps the exact-count and accessibility safeguards", async () => {
   assert.ok(packedMask);
   assert.equal(JSON.parse(packedMask).split(" ").length, 10_000);
   assert.match(page, /aria-label=\{`Interactive UK map containing exactly/);
-  assert.match(page, /Mock checkout/);
+  assert.match(page, /Proceed to secure payment/);
+  assert.match(page, /const AVAILABLE_PIXELS = PIXELS\.filter\(\(pixel\) => !pixel\.owner\)\.length/);
+  assert.doesNotMatch(page, /mockOwner|const OWNERS/);
+  assert.doesNotMatch(page, /[↗↓✦]/);
   assert.match(page, /className="zoom-controls"/);
-  assert.match(page, /Math\.min\(2\.5/);
+  assert.match(page, /Math\.min\(5/);
   assert.match(page, /RIPPLE_CELLS/);
   assert.match(page, /type="color"/);
   assert.match(page, /\["Royal blue", "#3256d8"\]/);

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { UK_GRID_HEIGHT, UK_GRID_WIDTH, UK_MASK_PACKED } from "./generated-uk-mask";
 
 type Pixel = { id: number; x: number; y: number; owner?: Owner };
@@ -9,23 +9,16 @@ const GRID_H = UK_GRID_HEIGHT;
 const TOTAL_PIXELS = 10_000;
 const PRICE = 2;
 
-const OWNERS: Owner[] = [
-  { name: "North Star Studio", colour: "#ffcb3d", title: "Bright ideas, made in Britain", link: "https://example.com/north-star", note: "An independent creative studio claiming a little piece of the North." },
-  { name: "Green Thread", colour: "#4fe3a4", title: "Better things, thoughtfully made", link: "https://example.com/green-thread", note: "British design with a lighter footprint." },
-  { name: "The Red Lion", colour: "#ff6257", title: "A proper local, online", link: "https://example.com/red-lion", note: "Good food, local stories and a warm welcome." },
-  { name: "Pixel & Co.", colour: "#9e7bff", title: "Tiny square. Big idea.", link: "https://example.com/pixel", note: "Early UK² supporter and digital mischief-maker." },
-];
-
 function buildPixels(): Pixel[] {
   return UK_MASK_PACKED.split(" ").map((cell, index) => {
     const [x, y] = cell.split(".").map((value) => Number.parseInt(value, 36));
-    const mockOwner = index % 311 === 0 ? OWNERS[index % OWNERS.length] : index % 487 === 0 ? OWNERS[(index + 1) % OWNERS.length] : undefined;
-    return { id: index + 1, x, y, owner: mockOwner };
+    return { id: index + 1, x, y };
   });
 }
 
 const PIXELS = buildPixels();
 if (PIXELS.length !== TOTAL_PIXELS) throw new Error(`UK² map must contain exactly ${TOTAL_PIXELS} squares; generated ${PIXELS.length}.`);
+const AVAILABLE_PIXELS = PIXELS.filter((pixel) => !pixel.owner).length;
 const PIXEL_LOOKUP = new Map(PIXELS.map((p) => [`${p.x}:${p.y}`, p]));
 const RIPPLE_CELLS = (() => {
   const land = new Set(PIXELS.map((pixel) => `${pixel.x}:${pixel.y}`));
@@ -92,7 +85,7 @@ function PixelMap({ selected, colour, onToggle, onOpenOwner }: {
   }, [zoom]);
 
   const changeZoom = useCallback((next: number) => {
-    const level = Math.max(1, Math.min(2.5, Math.round(next * 4) / 4));
+    const level = Math.max(1, Math.min(5, Math.round(next * 4) / 4));
     setZoom(level);
     setPan((current) => level === 1 ? { x: 0, y: 0 } : clampPan(current, level));
   }, [clampPan]);
@@ -265,9 +258,9 @@ function PixelMap({ selected, colour, onToggle, onOpenOwner }: {
         onWheel={(event) => { event.preventDefault(); changeZoom(zoom + (event.deltaY < 0 ? .25 : -.25)); }}
       />
       <div className="zoom-controls" aria-label="Map zoom controls">
-        <button type="button" onClick={() => changeZoom(zoom + .25)} disabled={zoom >= 2.5} aria-label="Zoom in">+</button>
+        <button type="button" onClick={() => changeZoom(zoom + .25)} disabled={zoom >= 5} aria-label="Zoom in">+</button>
         <output aria-live="polite">{Math.round(zoom * 100)}%</output>
-        <button type="button" onClick={() => changeZoom(zoom - .25)} disabled={zoom <= 1} aria-label="Zoom out">−</button>
+        <button type="button" onClick={() => changeZoom(zoom - .25)} disabled={zoom <= 1} aria-label="Zoom out">-</button>
         <button type="button" className="zoom-reset" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }} disabled={zoom === 1 && pan.x === 0 && pan.y === 0}>Reset</button>
       </div>
       <div className={`pixel-tooltip ${hovered ? "is-visible" : ""}`} aria-hidden="true">
@@ -299,18 +292,16 @@ export default function Home() {
     });
   }, []);
 
-  const ownedCount = useMemo(() => PIXELS.filter((pixel) => pixel.owner).length, []);
-
   return (
     <main>
       <div className="ocean" aria-hidden="true"><div /><div /><div /></div>
       <header className="site-header">
         <a className="brand" href="#home" aria-label="UK squared home"><span>UK</span><sup>2</sup></a>
-        <button className="menu-button" aria-expanded={menuOpen} aria-controls="site-nav" onClick={() => setMenuOpen(!menuOpen)}>Menu</button>
+        <button className="menu-button" aria-expanded={menuOpen} aria-controls="site-nav" onClick={() => setMenuOpen(!menuOpen)}>MENU</button>
         <nav id="site-nav" className={menuOpen ? "is-open" : ""} aria-label="Main navigation">
-          <a href="#home" onClick={() => setMenuOpen(false)}>Home</a>
-          <a href="#about" onClick={() => setMenuOpen(false)}>About</a>
-          <a href="#why-buy" onClick={() => setMenuOpen(false)}>Why buy</a>
+          <a href="#home" onClick={() => setMenuOpen(false)}>HOME</a>
+          <a href="#about" onClick={() => setMenuOpen(false)}>ABOUT</a>
+          <a href="#why-buy" onClick={() => setMenuOpen(false)}>WHY BUY</a>
         </nav>
         <button className="header-cta" onClick={() => document.querySelector(".pixel-map")?.scrollIntoView({ behavior: "smooth", block: "center" })}>Claim squares</button>
       </header>
@@ -318,14 +309,14 @@ export default function Home() {
       <section className="hero" id="home">
         <div className="hero-copy">
           <p className="eyebrow"><span /> The digital land grab</p>
-          <h1>Claim your place<br />on the <em>map.</em></h1>
+          <h1>CLAIM YOUR PLACE<br />ON THE <em>MAP.</em></h1>
           <p className="intro">10,000 squares. One iconic island. Own a permanent piece of the UK² map and make your mark.</p>
           <div className="hero-actions">
-            <button className="primary" onClick={() => document.querySelector(".pixel-map")?.scrollIntoView({ behavior: "smooth", block: "center" })}>Choose your squares <span>↗</span></button>
-            <a href="#about">How it works <span>↓</span></a>
+            <button className="primary" onClick={() => document.querySelector(".pixel-map")?.scrollIntoView({ behavior: "smooth", block: "center" })}>Choose your squares</button>
+            <a href="#about">How it works</a>
           </div>
           <div className="live-stats">
-            <div><strong>{formatNumber(TOTAL_PIXELS - ownedCount)}</strong><span>Squares available</span></div>
+            <div><strong>{formatNumber(AVAILABLE_PIXELS)}</strong><span>Squares available</span></div>
             <div><strong>£{PRICE}</strong><span>Per square</span></div>
             <div><strong>Forever</strong><span>On the map</span></div>
           </div>
@@ -334,12 +325,12 @@ export default function Home() {
         <div className="map-stage">
           <div className="map-status"><span className="pulse" /> LIVE MAP <b>{formatNumber(TOTAL_PIXELS)} squares</b></div>
           <PixelMap selected={selected} colour={colour} onToggle={togglePixel} onOpenOwner={setOwnerPixel} />
-          <p className="map-instruction"><span>✦</span> Hover to explore · Scroll or use controls to zoom · Drag the ocean to move</p>
+          <p className="map-instruction">Hover to explore · Scroll or use controls to zoom · Drag the ocean to move</p>
         </div>
       </section>
 
       <section className="ticker" aria-label="How UK squared works">
-        <div>CHOOSE YOUR SQUARES <span>✦</span> PICK YOUR COLOUR <span>✦</span> ADD YOUR LINK <span>✦</span> STAY ON THE MAP <span>✦</span> CHOOSE YOUR SQUARES <span>✦</span></div>
+        <div>CHOOSE YOUR SQUARES <span>|</span> PICK YOUR COLOUR <span>|</span> ADD YOUR LINK <span>|</span> STAY ON THE MAP <span>|</span> CHOOSE YOUR SQUARES <span>|</span></div>
       </section>
 
       <section className="content-section about-section" id="about">
@@ -361,7 +352,7 @@ export default function Home() {
           <p className="eyebrow"><span /> Why buy?</p>
           <h2>Part advert.<br />Part artwork.<br /><em>Part of history.</em></h2>
           <p>Get in early, build something memorable and own a visible piece of a distinctly British internet landmark.</p>
-          <button className="primary light" onClick={() => document.querySelector(".pixel-map")?.scrollIntoView({ behavior: "smooth", block: "center" })}>Find your spot <span>↗</span></button>
+          <button className="primary light" onClick={() => document.querySelector(".pixel-map")?.scrollIntoView({ behavior: "smooth", block: "center" })}>Find your spot</button>
         </div>
         <div className="benefit-grid">
           <article><span>01</span><h3>Be seen</h3><p>A permanent visual presence that invites curiosity and clicks.</p></article>
@@ -390,20 +381,20 @@ export default function Home() {
           </div>
           <div className="dock-total"><span>Total</span><strong>£{selected.size * PRICE}</strong></div>
           <button className="dock-clear" onClick={() => setSelected(new Set())}>Clear</button>
-          <button className="dock-buy" onClick={() => setPurchaseOpen(true)}>Continue <span>↗</span></button>
+          <button className="dock-buy" onClick={() => setPurchaseOpen(true)}>Checkout</button>
         </aside>
       )}
 
       {ownerPixel?.owner && (
         <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setOwnerPixel(null); }}>
           <section className="modal owner-modal" role="dialog" aria-modal="true" aria-labelledby="owner-title">
-            <button className="modal-close" onClick={() => setOwnerPixel(null)} aria-label="Close">×</button>
+            <button className="modal-close" onClick={() => setOwnerPixel(null)}>Close</button>
             <div className="owner-swatch" style={{ background: ownerPixel.owner.colour }}>#{ownerPixel.id}</div>
             <p className="eyebrow dark"><span /> Owned square</p>
             <h2 id="owner-title">{ownerPixel.owner.name}</h2>
             <h3>{ownerPixel.owner.title}</h3>
             <p>{ownerPixel.owner.note}</p>
-            <a className="primary modal-link" href={ownerPixel.owner.link} target="_blank" rel="noreferrer">Visit their page <span>↗</span></a>
+            <a className="primary modal-link" href={ownerPixel.owner.link} target="_blank" rel="noreferrer">Visit their page</a>
           </section>
         </div>
       )}
@@ -411,15 +402,20 @@ export default function Home() {
       {purchaseOpen && (
         <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setPurchaseOpen(false); }}>
           <section className="modal purchase-modal" role="dialog" aria-modal="true" aria-labelledby="purchase-title">
-            <button className="modal-close" onClick={() => setPurchaseOpen(false)} aria-label="Close">×</button>
-            <p className="eyebrow dark"><span /> Reserve your place</p>
+            <button className="modal-close" onClick={() => setPurchaseOpen(false)}>Close</button>
+            <p className="eyebrow dark"><span /> Secure checkout</p>
             <h2 id="purchase-title">Your {selected.size === 1 ? "square" : `${selected.size} squares`}</h2>
-            <p className="purchase-note">This is a working preview. Payments and permanent ownership will be connected before launch.</p>
+            <p className="purchase-note">Review your selection and advert details. The final button will connect to Stripe Checkout when the secure ownership service is enabled.</p>
+            <div className="purchase-selection">
+              <span className="purchase-colour" style={{ background: colour }} />
+              <p><strong>Selected squares</strong><small>{Array.from(selected).slice(0, 8).map((id) => `#${id}`).join(", ")}{selected.size > 8 ? ` and ${selected.size - 8} more` : ""}</small></p>
+            </div>
             <label>Your name or brand<input type="text" placeholder="e.g. North Star Studio" /></label>
+            <label>Email address<input type="email" placeholder="you@example.com" /></label>
             <label>Headline<input type="text" placeholder="A short line visitors will see" /></label>
             <label>Destination link<input type="url" placeholder="https://" /></label>
             <div className="purchase-summary"><span>{selected.size} × £{PRICE}</span><strong>£{selected.size * PRICE}</strong></div>
-            <button className="primary purchase-button" onClick={() => { setPurchaseOpen(false); setSelected(new Set()); alert("Thanks — your mock reservation has been recorded on this device."); }}>Mock checkout <span>↗</span></button>
+            <button className="primary purchase-button" onClick={() => alert("Secure payment will be enabled when Stripe and the permanent ownership database are connected.")}>Proceed to secure payment</button>
           </section>
         </div>
       )}

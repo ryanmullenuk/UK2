@@ -9,8 +9,8 @@ An interactive digital map of the United Kingdom made from exactly 10,000 indivi
 - Pointer hover, click, tap and drag selection
 - Multiple-square selection and live pricing
 - Colour choice for patterns, initials and pixel art
-- Mock buyer profiles, advertisements and outbound links
-- Mock checkout ready to be replaced with a payment and ownership service
+- Buyer profile, advertisement and outbound-link display states ready for live ownership data
+- Checkout review screen ready to hand off to a secure payment and ownership service
 - Responsive layouts and reduced-motion support
 
 ## Local setup
@@ -38,15 +38,19 @@ The repository includes a GitHub Actions workflow for GitHub Pages. In the repos
 
 ## Connecting the live purchase flow
 
-The current front end uses deterministic mock ownership data. A production service should provide:
+All 10,000 squares currently start available. Permanent sales require a server-side ownership service; payment keys and purchase enforcement must not be placed in the GitHub Pages front end.
 
-1. Pixel availability and ownership records keyed by pixel ID
-2. Temporary reservations to prevent competing checkouts
-3. Stripe Checkout or an equivalent payment flow
-4. Buyer profile, colour and destination-link moderation
-5. A webhook that confirms payment before ownership is written permanently
+Recommended production flow:
 
-Keep the canvas renderer and replace the mock owner assignment in `app/page.tsx` with data from the chosen API.
+1. Store one database row per square, keyed by the existing pixel ID, with `available`, `reserved` and `owned` states.
+2. When checkout starts, call a server-side function that reserves every requested ID in one database transaction. A unique primary key and conditional update prevent overlapping orders.
+3. Give reservations a short expiry so abandoned checkouts return their squares to sale.
+4. Create a one-time [Stripe Checkout Session](https://docs.stripe.com/payments/checkout) on the server and attach the reservation or order ID as metadata.
+5. Redirect the buyer to Stripe's hosted payment page. Never expose the Stripe secret key in this repository or browser code.
+6. Verify Stripe's signed `checkout.session.completed` webhook, then atomically change the reserved rows to `owned` and store their permanent colour, owner profile, advert and link.
+7. Load public ownership rows when the map opens and subscribe to database changes so sold squares update for every visitor.
+
+[Supabase Edge Functions](https://supabase.com/docs/guides/functions) are a suitable server-side layer for creating Checkout Sessions and receiving signed Stripe webhooks. Any public database tables should have Row Level Security enabled, with browser access limited to safe ownership reads.
 
 ## Map data note
 
