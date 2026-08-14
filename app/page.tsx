@@ -1,49 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { UK_GRID_HEIGHT, UK_GRID_WIDTH, UK_MASK_PACKED } from "./generated-uk-mask";
 
-type Point = [number, number];
 type Pixel = { id: number; x: number; y: number; owner?: Owner };
 type Owner = { name: string; colour: string; title: string; link: string; note: string };
 
-const GRID_W = 168;
-const GRID_H = 236;
+const GRID_W = UK_GRID_WIDTH;
+const GRID_H = UK_GRID_HEIGHT;
 const TOTAL_PIXELS = 10_000;
 const PRICE = 2;
-
-// Deliberately angular, simplified coastline paths. Fine detail is resolved by the square grid.
-const GREAT_BRITAIN: Point[] = [
-  [83, 221], [77, 218], [75, 212], [67, 209], [62, 204], [52, 203], [45, 197],
-  [49, 190], [42, 184], [47, 178], [42, 171], [49, 166], [47, 158], [53, 151],
-  [52, 143], [58, 137], [58, 129], [63, 122], [62, 114], [68, 106], [70, 96],
-  [75, 90], [71, 82], [75, 75], [72, 67], [77, 61], [74, 52], [78, 46], [74, 38],
-  [80, 35], [78, 29], [85, 27], [88, 20], [96, 18], [99, 23], [106, 19],
-  [111, 24], [107, 30], [113, 34], [108, 39], [112, 45], [106, 49], [109, 55],
-  [103, 60], [106, 67], [100, 72], [104, 79], [98, 86], [104, 93], [101, 100],
-  [108, 106], [104, 113], [111, 119], [108, 127], [116, 133], [114, 142],
-  [122, 148], [119, 154], [128, 158], [124, 164], [135, 168], [131, 175],
-  [139, 180], [132, 185], [137, 192], [128, 196], [130, 202], [120, 204],
-  [116, 211], [105, 209], [101, 216], [93, 213], [89, 221]
-];
-
-const NORTHERN_IRELAND: Point[] = [
-  [34, 111], [28, 108], [22, 111], [17, 107], [13, 101], [17, 95], [14, 88],
-  [21, 84], [27, 86], [31, 82], [37, 87], [44, 87], [48, 93], [45, 99],
-  [48, 105], [42, 109], [40, 115]
-];
-
-const ISLANDS: Point[][] = [
-  [[84, 228], [92, 228], [94, 233], [87, 235], [81, 232]], // Isle of Wight
-  [[51, 135], [56, 132], [59, 136], [55, 141], [50, 140]], // Anglesey
-  [[64, 70], [68, 66], [70, 72], [67, 78], [63, 76]], // Arran
-  [[61, 52], [66, 48], [68, 54], [64, 61], [60, 58]], // Islay/Jura
-  [[55, 38], [60, 34], [64, 38], [61, 45], [55, 44]], // Mull
-  [[47, 20], [53, 16], [57, 21], [53, 28], [47, 26]], // Skye
-  [[37, 12], [42, 8], [46, 12], [43, 18], [37, 17]], // Outer Hebrides
-  [[91, 8], [95, 4], [100, 7], [98, 12], [92, 13]], // Orkney
-  [[103, 1], [107, 0], [110, 4], [107, 8], [103, 6]], // Shetland
-  [[145, 205], [149, 202], [153, 206], [150, 210], [145, 209]], // East coast island marker
-];
 
 const OWNERS: Owner[] = [
   { name: "North Star Studio", colour: "#ffcb3d", title: "Bright ideas, made in Britain", link: "https://example.com/north-star", note: "An independent creative studio claiming a little piece of the North." },
@@ -52,57 +18,11 @@ const OWNERS: Owner[] = [
   { name: "Pixel & Co.", colour: "#9e7bff", title: "Tiny square. Big idea.", link: "https://example.com/pixel", note: "Early UK² supporter and digital mischief-maker." },
 ];
 
-function insidePolygon(x: number, y: number, polygon: Point[]) {
-  let inside = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const [xi, yi] = polygon[i];
-    const [xj, yj] = polygon[j];
-    const crossed = yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi || 1) + xi;
-    if (crossed) inside = !inside;
-  }
-  return inside;
-}
-
-function isLand(x: number, y: number) {
-  return insidePolygon(x, y, GREAT_BRITAIN) || insidePolygon(x, y, NORTHERN_IRELAND) || ISLANDS.some((p) => insidePolygon(x, y, p));
-}
-
-function hash(x: number, y: number) {
-  let n = Math.imul(x + 13, 374761393) + Math.imul(y + 31, 668265263);
-  n = (n ^ (n >>> 13)) >>> 0;
-  return n;
-}
-
 function buildPixels(): Pixel[] {
-  const candidates: Array<{ x: number; y: number; score: number }> = [];
-  for (let y = 0; y < GRID_H; y++) {
-    for (let x = 0; x < GRID_W; x++) {
-      if (!isLand(x, y)) continue;
-      let neighbours = 0;
-      for (let oy = -2; oy <= 2; oy++) for (let ox = -2; ox <= 2; ox++) if (isLand(x + ox, y + oy)) neighbours++;
-      candidates.push({ x, y, score: neighbours * 1_000_000 + hash(x, y) });
-    }
-  }
-
-  let chosen = candidates;
-  if (candidates.length > TOTAL_PIXELS) {
-    chosen = [...candidates].sort((a, b) => b.score - a.score).slice(0, TOTAL_PIXELS);
-  } else if (candidates.length < TOTAL_PIXELS) {
-    const used = new Set(candidates.map((p) => `${p.x}:${p.y}`));
-    const fringe: Array<{ x: number; y: number; score: number }> = [];
-    for (let y = 0; y < GRID_H; y++) for (let x = 0; x < GRID_W; x++) {
-      if (used.has(`${x}:${y}`)) continue;
-      let neighbours = 0;
-      for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) if (used.has(`${x + ox}:${y + oy}`)) neighbours++;
-      if (neighbours) fringe.push({ x, y, score: neighbours * 1_000_000 + hash(x, y) });
-    }
-    chosen = [...candidates, ...fringe.sort((a, b) => b.score - a.score).slice(0, TOTAL_PIXELS - candidates.length)];
-  }
-
-  chosen.sort((a, b) => a.y - b.y || a.x - b.x);
-  return chosen.map((p, index) => {
+  return UK_MASK_PACKED.split(" ").map((cell, index) => {
+    const [x, y] = cell.split(".").map((value) => Number.parseInt(value, 36));
     const mockOwner = index % 311 === 0 ? OWNERS[index % OWNERS.length] : index % 487 === 0 ? OWNERS[(index + 1) % OWNERS.length] : undefined;
-    return { id: index + 1, x: p.x, y: p.y, owner: mockOwner };
+    return { id: index + 1, x, y, owner: mockOwner };
   });
 }
 

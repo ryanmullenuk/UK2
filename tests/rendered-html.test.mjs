@@ -27,15 +27,20 @@ test("renders the finished UK squared experience", async () => {
 });
 
 test("keeps the exact-count and accessibility safeguards in source", async () => {
-  const [page, layout, css, packageJson] = await Promise.all([
+  const [page, layout, css, mask, packageJson] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    readFile(new URL("../app/generated-uk-mask.ts", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
   ]);
 
   assert.match(page, /const TOTAL_PIXELS = 10_000/);
   assert.match(page, /PIXELS\.length !== TOTAL_PIXELS/);
+  assert.match(page, /UK_MASK_PACKED/);
+  const packedMask = mask.match(/UK_MASK_PACKED = ("[^"]+")/)?.[1];
+  assert.ok(packedMask);
+  assert.equal(JSON.parse(packedMask).split(" ").length, 10_000);
   assert.match(page, /aria-label=\{`Interactive UK map containing exactly/);
   assert.match(page, /Mock checkout/);
   assert.match(css, /prefers-reduced-motion/);

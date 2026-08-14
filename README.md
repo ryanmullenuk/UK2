@@ -4,7 +4,7 @@ An interactive digital map of the United Kingdom made from exactly 10,000 indivi
 
 ## What is included
 
-- A programme-generated UK map including Great Britain, Northern Ireland and relevant islands
+- A geographically accurate, programme-generated UK map including Great Britain, Northern Ireland and relevant islands
 - Exactly 10,000 addressable land squares rendered on a high-performance canvas
 - Pointer hover, click, tap and drag selection
 - Multiple-square selection and live pricing
@@ -48,4 +48,12 @@ Keep the canvas renderer and replace the mock owner assignment in `app/page.tsx`
 
 ## Map data note
 
-The map is an original, deliberately pixel-styled approximation. It is generated from vector paths and corrected to exactly 10,000 land squares at runtime; no map image is used.
+The map mask is generated from the [ONS UK TopoJSON dataset](https://github.com/ONSvisual/uk-topojson), projected onto a square grid and corrected to exactly 10,000 land squares. No map image is used at runtime.
+
+To regenerate the checked-in mask from the source geography:
+
+```bash
+npm run map:generate
+```
+
+Source: Office for National Statistics licensed under the Open Government Licence v3.0. Contains OS data © Crown copyright and database right.
