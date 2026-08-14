@@ -9,6 +9,8 @@ test("builds a public GitHub Pages entry point", async () => {
   assert.match(html, /<div id="root"><\/div>/i);
   assert.match(html, /\/UK2\/assets\/[^"']+\.js/i);
   assert.match(html, /https:\/\/ryanmullenuk\.github\.io\/UK2\/og\.png/i);
+  assert.match(html, /\/UK2\/apple-touch-icon\.png/i);
+  assert.match(html, /\/UK2\/site\.webmanifest/i);
   assert.doesNotMatch(html, /chatgpt|sign[ -]?in|auth/i);
 });
 
@@ -34,11 +36,17 @@ test("keeps the exact-count and accessibility safeguards", async () => {
   assert.doesNotMatch(page, /[↗↓✦]/);
   assert.match(page, /className="zoom-controls"/);
   assert.match(page, /Math\.min\(5/);
+  assert.match(page, /const animateCamera/);
+  assert.match(page, /duration = reset \? 520 : 320/);
+  assert.match(page, /create a permanent place to remember someone/);
   assert.match(page, /RIPPLE_CELLS/);
   assert.match(page, /type="color"/);
   assert.match(page, /\["Royal blue", "#3256d8"\]/);
   assert.match(css, /prefers-reduced-motion/);
   assert.match(css, /\.pixel-ripples/);
+  assert.match(css, /\.primary \{[^}]*background: transparent[^}]*box-shadow: none/s);
+  assert.match(css, /\.benefit-grid article:hover/);
+  assert.match(css, /\.purchase-modal \{ border: 0; box-shadow: none; \}/);
   assert.doesNotMatch(packageJson, /vinext|wrangler|cloudflare|drizzle|next/i);
   assert.match(workflow, /path: dist\s*$/m);
 });

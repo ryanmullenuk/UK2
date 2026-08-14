@@ -73,6 +73,9 @@ function PixelMap({ selected, colour, onToggle, onOpenOwner }: {
   const lastPainted = useRef<number | null>(null);
   const panDrag = useRef<{ pointerId: number; x: number; y: number; originX: number; originY: number } | null>(null);
   const metricsRef = useRef({ baseCell: 1, width: 1, height: 1 });
+  const zoomRef = useRef(1);
+  const panRef = useRef({ x: 0, y: 0 });
+  const cameraAnimationRef = useRef(0);
 
   const clampPan = useCallback((next: { x: number; y: number }, level = zoom) => {
     const { baseCell, width, height } = metricsRef.current;
@@ -84,11 +87,44 @@ function PixelMap({ selected, colour, onToggle, onOpenOwner }: {
     };
   }, [zoom]);
 
-  const changeZoom = useCallback((next: number) => {
-    const level = Math.max(1, Math.min(5, Math.round(next * 4) / 4));
+  const setCamera = useCallback((level: number, position: { x: number; y: number }) => {
+    zoomRef.current = level;
+    panRef.current = position;
     setZoom(level);
-    setPan((current) => level === 1 ? { x: 0, y: 0 } : clampPan(current, level));
-  }, [clampPan]);
+    setPan(position);
+  }, []);
+
+  const animateCamera = useCallback((next: number, reset = false) => {
+    cancelAnimationFrame(cameraAnimationRef.current);
+    const targetZoom = Math.max(1, Math.min(5, Math.round(next * 4) / 4));
+    const startZoom = zoomRef.current;
+    const startPan = panRef.current;
+    const targetPan = reset || targetZoom === 1 ? { x: 0, y: 0 } : clampPan(startPan, targetZoom);
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (reducedMotion) {
+      setCamera(targetZoom, targetPan);
+      return;
+    }
+
+    const started = performance.now();
+    const duration = reset ? 520 : 320;
+    const step = (time: number) => {
+      const progress = Math.min(1, (time - started) / duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setCamera(
+        startZoom + (targetZoom - startZoom) * eased,
+        {
+          x: startPan.x + (targetPan.x - startPan.x) * eased,
+          y: startPan.y + (targetPan.y - startPan.y) * eased,
+        },
+      );
+      if (progress < 1) cameraAnimationRef.current = requestAnimationFrame(step);
+    };
+    cameraAnimationRef.current = requestAnimationFrame(step);
+  }, [clampPan, setCamera]);
+
+  useEffect(() => () => cancelAnimationFrame(cameraAnimationRef.current), []);
 
   const render = useCallback(() => {
     const canvas = canvasRef.current;
@@ -99,10 +135,12 @@ function PixelMap({ selected, colour, onToggle, onOpenOwner }: {
     const ratio = Math.min(window.devicePixelRatio || 1, 2);
     const width = Math.max(300, rect.width);
     const height = Math.max(420, rect.height);
-    canvas.width = width * ratio;
-    canvas.height = height * ratio;
-    rippleCanvas.width = width * ratio;
-    rippleCanvas.height = height * ratio;
+    const renderWidth = Math.round(width * ratio);
+    const renderHeight = Math.round(height * ratio);
+    if (canvas.width !== renderWidth) canvas.width = renderWidth;
+    if (canvas.height !== renderHeight) canvas.height = renderHeight;
+    if (rippleCanvas.width !== renderWidth) rippleCanvas.width = renderWidth;
+    if (rippleCanvas.height !== renderHeight) rippleCanvas.height = renderHeight;
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
     rippleCanvas.style.width = `${width}px`;
@@ -210,7 +248,9 @@ function PixelMap({ selected, colour, onToggle, onOpenOwner }: {
   const handleMove = (event: React.PointerEvent) => {
     if (panDrag.current?.pointerId === event.pointerId) {
       const drag = panDrag.current;
-      setPan(clampPan({ x: drag.originX + event.clientX - drag.x, y: drag.originY + event.clientY - drag.y }));
+      const nextPan = clampPan({ x: drag.originX + event.clientX - drag.x, y: drag.originY + event.clientY - drag.y });
+      panRef.current = nextPan;
+      setPan(nextPan);
       return;
     }
     const pixel = pointToPixel(event.clientX, event.clientY);
@@ -235,7 +275,8 @@ function PixelMap({ selected, colour, onToggle, onOpenOwner }: {
           const pixel = pointToPixel(event.clientX, event.clientY);
           if (!pixel) {
             if (zoom > 1) {
-              panDrag.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, originX: pan.x, originY: pan.y };
+              cancelAnimationFrame(cameraAnimationRef.current);
+              panDrag.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, originX: panRef.current.x, originY: panRef.current.y };
               setIsPanning(true);
               event.currentTarget.setPointerCapture(event.pointerId);
             }
@@ -255,13 +296,13 @@ function PixelMap({ selected, colour, onToggle, onOpenOwner }: {
           setIsPanning(false);
         }}
         onPointerCancel={() => { setPainting(false); panDrag.current = null; setIsPanning(false); }}
-        onWheel={(event) => { event.preventDefault(); changeZoom(zoom + (event.deltaY < 0 ? .25 : -.25)); }}
+        onWheel={(event) => { event.preventDefault(); animateCamera(zoomRef.current + (event.deltaY < 0 ? .25 : -.25)); }}
       />
       <div className="zoom-controls" aria-label="Map zoom controls">
-        <button type="button" onClick={() => changeZoom(zoom + .25)} disabled={zoom >= 5} aria-label="Zoom in">+</button>
+        <button type="button" onClick={() => animateCamera(zoomRef.current + .25)} disabled={zoom >= 5} aria-label="Zoom in">+</button>
         <output aria-live="polite">{Math.round(zoom * 100)}%</output>
-        <button type="button" onClick={() => changeZoom(zoom - .25)} disabled={zoom <= 1} aria-label="Zoom out">-</button>
-        <button type="button" className="zoom-reset" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }} disabled={zoom === 1 && pan.x === 0 && pan.y === 0}>Reset</button>
+        <button type="button" onClick={() => animateCamera(zoomRef.current - .25)} disabled={zoom <= 1} aria-label="Zoom out">-</button>
+        <button type="button" className="zoom-reset" onClick={() => animateCamera(1, true)} disabled={zoom === 1 && pan.x === 0 && pan.y === 0}>Reset</button>
       </div>
       <div className={`pixel-tooltip ${hovered ? "is-visible" : ""}`} aria-hidden="true">
         {hovered?.owner ? <><strong>{hovered.owner.name}</strong><span>Square #{hovered.id} · View profile</span></> : hovered ? <><strong>Square #{hovered.id}</strong><span>Available · £{PRICE}</span></> : null}
@@ -343,7 +384,7 @@ export default function Home() {
         <div className="steps">
           <article><b>01</b><h3>Choose</h3><p>Pick one square, a cluster, or plot out a pattern anywhere that is still available.</p></article>
           <article><b>02</b><h3>Make it yours</h3><p>Choose your colour and add a name, message, advert or link to your corner of the map.</p></article>
-          <article><b>03</b><h3>Be discovered</h3><p>Every owned square is clickable, giving visitors a direct route to your story.</p></article>
+          <article><b>03</b><h3>Be discovered</h3><p>Every owned square is clickable, giving visitors a direct route to your advert or story. Promote something, buy a square for someone, or create a permanent place to remember someone.</p></article>
         </div>
       </section>
 
