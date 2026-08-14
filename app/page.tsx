@@ -27,6 +27,37 @@ function buildPixels(): Pixel[] {
 const PIXELS = buildPixels();
 if (PIXELS.length !== TOTAL_PIXELS) throw new Error(`UK² map must contain exactly ${TOTAL_PIXELS} squares; generated ${PIXELS.length}.`);
 const PIXEL_LOOKUP = new Map(PIXELS.map((p) => [`${p.x}:${p.y}`, p]));
+const RIPPLE_CELLS = (() => {
+  const land = new Set(PIXELS.map((pixel) => `${pixel.x}:${pixel.y}`));
+  const visited = new Set(land);
+  let frontier = PIXELS.map(({ x, y }) => ({ x, y }));
+  const ripples: Array<{ x: number; y: number; band: number }> = [];
+
+  for (let band = 1; band <= 5; band += 1) {
+    const next: Array<{ x: number; y: number }> = [];
+    for (const cell of frontier) {
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const x = cell.x + dx;
+        const y = cell.y + dy;
+        const key = `${x}:${y}`;
+        if (x < 0 || x >= GRID_W || y < 0 || y >= GRID_H || visited.has(key)) continue;
+        visited.add(key);
+        next.push({ x, y });
+        if ((x + y + band) % 2 === 0) ripples.push({ x, y, band });
+      }
+    }
+    frontier = next;
+  }
+
+  return ripples;
+})();
+
+const COLOURS = [
+  ["Sunshine", "#ffcb3d"], ["Coral", "#ff6257"], ["Mint", "#4fe3a4"], ["Violet", "#9e7bff"],
+  ["Pink", "#ff8ec7"], ["Cyan", "#22c8eb"], ["White", "#f4f7f3"], ["Navy", "#102d52"],
+  ["Orange", "#ff8a34"], ["Lime", "#b8ec45"], ["Sky", "#72b8ff"], ["Lavender", "#c9a7ff"],
+  ["Crimson", "#c9364f"], ["Teal", "#159c9a"], ["Royal blue", "#3256d8"], ["Black", "#07111f"],
+] as const;
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat("en-GB").format(value);
@@ -39,30 +70,59 @@ function PixelMap({ selected, colour, onToggle, onOpenOwner }: {
   onOpenOwner: (pixel: Pixel) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const rippleCanvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [hovered, setHovered] = useState<Pixel | null>(null);
   const [painting, setPainting] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
   const lastPainted = useRef<number | null>(null);
+  const panDrag = useRef<{ pointerId: number; x: number; y: number; originX: number; originY: number } | null>(null);
+  const metricsRef = useRef({ baseCell: 1, width: 1, height: 1 });
+
+  const clampPan = useCallback((next: { x: number; y: number }, level = zoom) => {
+    const { baseCell, width, height } = metricsRef.current;
+    const maxX = Math.max(0, (GRID_W * baseCell * level - width) / 2) + 28;
+    const maxY = Math.max(0, (GRID_H * baseCell * level - height) / 2) + 28;
+    return {
+      x: Math.max(-maxX, Math.min(maxX, next.x)),
+      y: Math.max(-maxY, Math.min(maxY, next.y)),
+    };
+  }, [zoom]);
+
+  const changeZoom = useCallback((next: number) => {
+    const level = Math.max(1, Math.min(2.5, Math.round(next * 4) / 4));
+    setZoom(level);
+    setPan((current) => level === 1 ? { x: 0, y: 0 } : clampPan(current, level));
+  }, [clampPan]);
 
   const render = useCallback(() => {
     const canvas = canvasRef.current;
+    const rippleCanvas = rippleCanvasRef.current;
     const wrap = wrapRef.current;
-    if (!canvas || !wrap) return;
+    if (!canvas || !rippleCanvas || !wrap) return;
     const rect = wrap.getBoundingClientRect();
     const ratio = Math.min(window.devicePixelRatio || 1, 2);
     const width = Math.max(300, rect.width);
     const height = Math.max(420, rect.height);
     canvas.width = width * ratio;
     canvas.height = height * ratio;
+    rippleCanvas.width = width * ratio;
+    rippleCanvas.height = height * ratio;
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
+    rippleCanvas.style.width = `${width}px`;
+    rippleCanvas.style.height = `${height}px`;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     ctx.clearRect(0, 0, width, height);
-    const cell = Math.min((width - 24) / GRID_W, (height - 18) / GRID_H);
-    const ox = (width - GRID_W * cell) / 2;
-    const oy = (height - GRID_H * cell) / 2;
+    const baseCell = Math.min((width - 24) / GRID_W, (height - 18) / GRID_H);
+    metricsRef.current = { baseCell, width, height };
+    const cell = baseCell * zoom;
+    const ox = (width - GRID_W * cell) / 2 + pan.x;
+    const oy = (height - GRID_H * cell) / 2 + pan.y;
 
     ctx.shadowColor = "rgba(4, 19, 42, .28)";
     ctx.shadowBlur = Math.max(5, cell * 2.5);
@@ -89,7 +149,13 @@ function PixelMap({ selected, colour, onToggle, onOpenOwner }: {
     canvas.dataset.cell = String(cell);
     canvas.dataset.ox = String(ox);
     canvas.dataset.oy = String(oy);
-  }, [colour, hovered, selected]);
+    rippleCanvas.dataset.cell = String(cell);
+    rippleCanvas.dataset.ox = String(ox);
+    rippleCanvas.dataset.oy = String(oy);
+    rippleCanvas.dataset.ratio = String(ratio);
+    rippleCanvas.dataset.width = String(width);
+    rippleCanvas.dataset.height = String(height);
+  }, [colour, hovered, pan, selected, zoom]);
 
   useEffect(() => {
     render();
@@ -97,6 +163,46 @@ function PixelMap({ selected, colour, onToggle, onOpenOwner }: {
     if (wrapRef.current) observer.observe(wrapRef.current);
     return () => observer.disconnect();
   }, [render]);
+
+  useEffect(() => {
+    let frame = 0;
+    let previous = Number.NEGATIVE_INFINITY;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const drawRipples = (time: number) => {
+      if (!reducedMotion) frame = requestAnimationFrame(drawRipples);
+      if (time - previous < 55) return;
+      previous = time;
+      const canvas = rippleCanvasRef.current;
+      if (!canvas) return;
+      const width = Number(canvas.dataset.width);
+      const height = Number(canvas.dataset.height);
+      const ratio = Number(canvas.dataset.ratio);
+      const cell = Number(canvas.dataset.cell);
+      const ox = Number(canvas.dataset.ox);
+      const oy = Number(canvas.dataset.oy);
+      if (!width || !height || !cell) return;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = "#bcecff";
+      for (const ripple of RIPPLE_CELLS) {
+        const wave = (Math.sin(time / 520 - ripple.band * .92) + 1) / 2;
+        ctx.globalAlpha = .035 + wave * .2 * (1 - ripple.band / 7);
+        const size = Math.max(1, cell * (.34 + wave * .3));
+        ctx.fillRect(
+          ox + (ripple.x + .5) * cell - size / 2,
+          oy + (ripple.y + .5) * cell - size / 2,
+          size,
+          size,
+        );
+      }
+      ctx.globalAlpha = 1;
+    };
+    if (reducedMotion) drawRipples(0);
+    else frame = requestAnimationFrame(drawRipples);
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   const pointToPixel = (clientX: number, clientY: number) => {
     const canvas = canvasRef.current;
@@ -109,6 +215,11 @@ function PixelMap({ selected, colour, onToggle, onOpenOwner }: {
   };
 
   const handleMove = (event: React.PointerEvent) => {
+    if (panDrag.current?.pointerId === event.pointerId) {
+      const drag = panDrag.current;
+      setPan(clampPan({ x: drag.originX + event.clientX - drag.x, y: drag.originY + event.clientY - drag.y }));
+      return;
+    }
     const pixel = pointToPixel(event.clientX, event.clientY);
     setHovered(pixel);
     if (painting && pixel && pixel.id !== lastPainted.current && !pixel.owner) {
@@ -119,16 +230,24 @@ function PixelMap({ selected, colour, onToggle, onOpenOwner }: {
 
   return (
     <div className="map-wrap" ref={wrapRef}>
+      <canvas ref={rippleCanvasRef} className="pixel-ripples" aria-hidden="true" />
       <canvas
         ref={canvasRef}
-        className="pixel-map"
+        className={`pixel-map ${isPanning ? "is-panning" : ""}`}
         aria-label={`Interactive UK map containing exactly ${formatNumber(TOTAL_PIXELS)} selectable squares. Use a pointer to explore and select land squares.`}
         role="img"
         onPointerMove={handleMove}
         onPointerLeave={() => { setHovered(null); setPainting(false); }}
         onPointerDown={(event) => {
           const pixel = pointToPixel(event.clientX, event.clientY);
-          if (!pixel) return;
+          if (!pixel) {
+            if (zoom > 1) {
+              panDrag.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, originX: pan.x, originY: pan.y };
+              setIsPanning(true);
+              event.currentTarget.setPointerCapture(event.pointerId);
+            }
+            return;
+          }
           if (pixel.owner) onOpenOwner(pixel);
           else {
             onToggle(pixel);
@@ -137,8 +256,20 @@ function PixelMap({ selected, colour, onToggle, onOpenOwner }: {
             event.currentTarget.setPointerCapture(event.pointerId);
           }
         }}
-        onPointerUp={() => setPainting(false)}
+        onPointerUp={(event) => {
+          setPainting(false);
+          if (panDrag.current?.pointerId === event.pointerId) panDrag.current = null;
+          setIsPanning(false);
+        }}
+        onPointerCancel={() => { setPainting(false); panDrag.current = null; setIsPanning(false); }}
+        onWheel={(event) => { event.preventDefault(); changeZoom(zoom + (event.deltaY < 0 ? .25 : -.25)); }}
       />
+      <div className="zoom-controls" aria-label="Map zoom controls">
+        <button type="button" onClick={() => changeZoom(zoom + .25)} disabled={zoom >= 2.5} aria-label="Zoom in">+</button>
+        <output aria-live="polite">{Math.round(zoom * 100)}%</output>
+        <button type="button" onClick={() => changeZoom(zoom - .25)} disabled={zoom <= 1} aria-label="Zoom out">−</button>
+        <button type="button" className="zoom-reset" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }} disabled={zoom === 1 && pan.x === 0 && pan.y === 0}>Reset</button>
+      </div>
       <div className={`pixel-tooltip ${hovered ? "is-visible" : ""}`} aria-hidden="true">
         {hovered?.owner ? <><strong>{hovered.owner.name}</strong><span>Square #{hovered.id} · View profile</span></> : hovered ? <><strong>Square #{hovered.id}</strong><span>Available · £{PRICE}</span></> : null}
       </div>
@@ -157,7 +288,6 @@ export default function Home() {
   const [ownerPixel, setOwnerPixel] = useState<Pixel | null>(null);
   const [purchaseOpen, setPurchaseOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const colours = ["#ffcb3d", "#ff6257", "#4fe3a4", "#9e7bff", "#ff8ec7", "#22c8eb", "#f4f7f3", "#102d52"];
 
   const togglePixel = useCallback((pixel: Pixel, add = false) => {
     setSelected((current) => {
@@ -204,7 +334,7 @@ export default function Home() {
         <div className="map-stage">
           <div className="map-status"><span className="pulse" /> LIVE MAP <b>{formatNumber(TOTAL_PIXELS)} squares</b></div>
           <PixelMap selected={selected} colour={colour} onToggle={togglePixel} onOpenOwner={setOwnerPixel} />
-          <p className="map-instruction"><span>✦</span> Hover to explore · Click or drag to select</p>
+          <p className="map-instruction"><span>✦</span> Hover to explore · Scroll or use controls to zoom · Drag the ocean to move</p>
         </div>
       </section>
 
@@ -252,7 +382,11 @@ export default function Home() {
         <aside className="selection-dock" aria-live="polite">
           <div><span>{selected.size}</span><p><strong>{selected.size === 1 ? "square" : "squares"} selected</strong><small>Click or drag to add more</small></p></div>
           <div className="palette" aria-label="Choose square colour">
-            {colours.map((item) => <button key={item} className={colour === item ? "active" : ""} style={{ background: item }} aria-label={`Choose ${item}`} onClick={() => setColour(item)} />)}
+            {COLOURS.map(([name, value]) => <button key={value} className={colour === value ? "active" : ""} style={{ background: value }} aria-label={`Choose ${name}`} title={name} onClick={() => setColour(value)} />)}
+            <label className="custom-colour" title="Choose a custom colour">
+              <span>Custom colour</span>
+              <input type="color" value={colour} onChange={(event) => setColour(event.target.value)} aria-label="Choose a custom colour" />
+            </label>
           </div>
           <div className="dock-total"><span>Total</span><strong>£{selected.size * PRICE}</strong></div>
           <button className="dock-clear" onClick={() => setSelected(new Set())}>Clear</button>
