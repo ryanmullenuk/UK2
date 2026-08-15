@@ -38,6 +38,11 @@ test("keeps the exact-count and accessibility safeguards", async () => {
   assert.match(page, /Math\.min\(5/);
   assert.match(page, /const animateCamera/);
   assert.match(page, /duration = reset \? 520 : 320/);
+  assert.match(page, /const getMapCache/);
+  assert.match(page, /ctx\.drawImage\(getMapCache\(\)/);
+  assert.match(page, /pointerMoveFrameRef/);
+  assert.match(page, /className=\{`map-selection-total/);
+  assert.match(page, /£\{selected\.size \* PRICE\}/);
   assert.match(page, /create a permanent place to remember someone/);
   assert.match(page, /RIPPLE_CELLS/);
   assert.match(page, /type="color"/);

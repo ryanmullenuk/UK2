@@ -64,18 +64,38 @@ function PixelMap({ selected, colour, onToggle, onOpenOwner }: {
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rippleCanvasRef = useRef<HTMLCanvasElement>(null);
+  const mapCacheRef = useRef<HTMLCanvasElement | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [hovered, setHovered] = useState<Pixel | null>(null);
-  const [painting, setPainting] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const lastPainted = useRef<number | null>(null);
+  const paintingRef = useRef(false);
+  const pointerMoveFrameRef = useRef(0);
+  const pendingPointerRef = useRef<{ pointerId: number; clientX: number; clientY: number } | null>(null);
   const panDrag = useRef<{ pointerId: number; x: number; y: number; originX: number; originY: number } | null>(null);
   const metricsRef = useRef({ baseCell: 1, width: 1, height: 1 });
   const zoomRef = useRef(1);
   const panRef = useRef({ x: 0, y: 0 });
   const cameraAnimationRef = useRef(0);
+
+  const getMapCache = useCallback(() => {
+    if (mapCacheRef.current) return mapCacheRef.current;
+    const scale = 4;
+    const cache = document.createElement("canvas");
+    cache.width = GRID_W * scale;
+    cache.height = GRID_H * scale;
+    const context = cache.getContext("2d");
+    if (!context) return cache;
+    context.imageSmoothingEnabled = false;
+    for (const pixel of PIXELS) {
+      context.fillStyle = pixel.owner?.colour || "#e8f2ef";
+      context.fillRect(pixel.x * scale, pixel.y * scale, scale - .65, scale - .65);
+    }
+    mapCacheRef.current = cache;
+    return cache;
+  }, []);
 
   const clampPan = useCallback((next: { x: number; y: number }, level = zoom) => {
     const { baseCell, width, height } = metricsRef.current;
@@ -120,11 +140,15 @@ function PixelMap({ selected, colour, onToggle, onOpenOwner }: {
         },
       );
       if (progress < 1) cameraAnimationRef.current = requestAnimationFrame(step);
+      else cameraAnimationRef.current = 0;
     };
     cameraAnimationRef.current = requestAnimationFrame(step);
   }, [clampPan, setCamera]);
 
-  useEffect(() => () => cancelAnimationFrame(cameraAnimationRef.current), []);
+  useEffect(() => () => {
+    cancelAnimationFrame(cameraAnimationRef.current);
+    cancelAnimationFrame(pointerMoveFrameRef.current);
+  }, []);
 
   const render = useCallback(() => {
     const canvas = canvasRef.current;
@@ -155,15 +179,11 @@ function PixelMap({ selected, colour, onToggle, onOpenOwner }: {
     const ox = (width - GRID_W * cell) / 2 + pan.x;
     const oy = (height - GRID_H * cell) / 2 + pan.y;
 
-    ctx.shadowColor = "rgba(4, 19, 42, .28)";
-    ctx.shadowBlur = Math.max(5, cell * 2.5);
-    for (const pixel of PIXELS) {
-      ctx.fillStyle = pixel.owner?.colour || "#e8f2ef";
-      ctx.fillRect(ox + pixel.x * cell, oy + pixel.y * cell, Math.max(1, cell - .18), Math.max(1, cell - .18));
-    }
-    ctx.shadowBlur = 0;
-    for (const pixel of PIXELS) {
-      if (!selected.has(pixel.id)) continue;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(getMapCache(), ox, oy, GRID_W * cell, GRID_H * cell);
+    for (const id of selected) {
+      const pixel = PIXELS[id - 1];
+      if (!pixel) continue;
       ctx.fillStyle = colour;
       ctx.fillRect(ox + pixel.x * cell, oy + pixel.y * cell, Math.max(1.2, cell - .08), Math.max(1.2, cell - .08));
     }
@@ -186,7 +206,7 @@ function PixelMap({ selected, colour, onToggle, onOpenOwner }: {
     rippleCanvas.dataset.ratio = String(ratio);
     rippleCanvas.dataset.width = String(width);
     rippleCanvas.dataset.height = String(height);
-  }, [colour, hovered, pan, selected, zoom]);
+  }, [colour, getMapCache, hovered, pan, selected, zoom]);
 
   useEffect(() => {
     render();
@@ -203,6 +223,7 @@ function PixelMap({ selected, colour, onToggle, onOpenOwner }: {
       if (!reducedMotion) frame = requestAnimationFrame(drawRipples);
       if (time - previous < 55) return;
       previous = time;
+      if (cameraAnimationRef.current || panDrag.current || paintingRef.current) return;
       const canvas = rippleCanvasRef.current;
       if (!canvas) return;
       const width = Number(canvas.dataset.width);
@@ -246,19 +267,26 @@ function PixelMap({ selected, colour, onToggle, onOpenOwner }: {
   };
 
   const handleMove = (event: React.PointerEvent) => {
-    if (panDrag.current?.pointerId === event.pointerId) {
-      const drag = panDrag.current;
-      const nextPan = clampPan({ x: drag.originX + event.clientX - drag.x, y: drag.originY + event.clientY - drag.y });
-      panRef.current = nextPan;
-      setPan(nextPan);
-      return;
-    }
-    const pixel = pointToPixel(event.clientX, event.clientY);
-    setHovered(pixel);
-    if (painting && pixel && pixel.id !== lastPainted.current && !pixel.owner) {
-      lastPainted.current = pixel.id;
-      onToggle(pixel, true);
-    }
+    pendingPointerRef.current = { pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY };
+    if (pointerMoveFrameRef.current) return;
+    pointerMoveFrameRef.current = requestAnimationFrame(() => {
+      pointerMoveFrameRef.current = 0;
+      const pointer = pendingPointerRef.current;
+      if (!pointer) return;
+      if (panDrag.current?.pointerId === pointer.pointerId) {
+        const drag = panDrag.current;
+        const nextPan = clampPan({ x: drag.originX + pointer.clientX - drag.x, y: drag.originY + pointer.clientY - drag.y });
+        panRef.current = nextPan;
+        setPan(nextPan);
+        return;
+      }
+      const pixel = pointToPixel(pointer.clientX, pointer.clientY);
+      setHovered((current) => current?.id === pixel?.id ? current : pixel);
+      if (paintingRef.current && pixel && pixel.id !== lastPainted.current && !pixel.owner) {
+        lastPainted.current = pixel.id;
+        onToggle(pixel, true);
+      }
+    });
   };
 
   return (
@@ -270,12 +298,13 @@ function PixelMap({ selected, colour, onToggle, onOpenOwner }: {
         aria-label={`Interactive UK map containing exactly ${formatNumber(TOTAL_PIXELS)} selectable squares. Use a pointer to explore and select land squares.`}
         role="img"
         onPointerMove={handleMove}
-        onPointerLeave={() => { setHovered(null); setPainting(false); }}
+        onPointerLeave={() => { setHovered(null); paintingRef.current = false; pendingPointerRef.current = null; }}
         onPointerDown={(event) => {
           const pixel = pointToPixel(event.clientX, event.clientY);
           if (!pixel) {
             if (zoom > 1) {
               cancelAnimationFrame(cameraAnimationRef.current);
+              cameraAnimationRef.current = 0;
               panDrag.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, originX: panRef.current.x, originY: panRef.current.y };
               setIsPanning(true);
               event.currentTarget.setPointerCapture(event.pointerId);
@@ -285,17 +314,17 @@ function PixelMap({ selected, colour, onToggle, onOpenOwner }: {
           if (pixel.owner) onOpenOwner(pixel);
           else {
             onToggle(pixel);
-            setPainting(true);
+            paintingRef.current = true;
             lastPainted.current = pixel.id;
             event.currentTarget.setPointerCapture(event.pointerId);
           }
         }}
         onPointerUp={(event) => {
-          setPainting(false);
+          paintingRef.current = false;
           if (panDrag.current?.pointerId === event.pointerId) panDrag.current = null;
           setIsPanning(false);
         }}
-        onPointerCancel={() => { setPainting(false); panDrag.current = null; setIsPanning(false); }}
+        onPointerCancel={() => { paintingRef.current = false; panDrag.current = null; setIsPanning(false); }}
         onWheel={(event) => { event.preventDefault(); animateCamera(zoomRef.current + (event.deltaY < 0 ? .25 : -.25)); }}
       />
       <div className="zoom-controls" aria-label="Map zoom controls">
@@ -365,6 +394,9 @@ export default function Home() {
 
         <div className="map-stage">
           <div className="map-status"><span className="pulse" /> LIVE MAP <b>{formatNumber(TOTAL_PIXELS)} squares</b></div>
+          <div className={`map-selection-total ${selected.size ? "is-visible" : ""}`} aria-live="polite">
+            <span>{selected.size} selected</span><strong>£{selected.size * PRICE}</strong>
+          </div>
           <PixelMap selected={selected} colour={colour} onToggle={togglePixel} onOpenOwner={setOwnerPixel} />
           <p className="map-instruction">Hover to explore · Scroll or use controls to zoom · Drag the ocean to move</p>
         </div>

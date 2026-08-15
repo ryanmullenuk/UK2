@@ -60,6 +60,10 @@ h1 em, h2 em { color: var(--yellow); font-family: Georgia, serif; font-weight: 4
 .map-stage::after { top: 0; bottom: 0; left: 50%; width: 1px; }
 .map-status { position: absolute; top: 0; left: 16px; right: 16px; z-index: 4; display: flex; align-items: center; gap: 8px; color: white; font-size: 9px; font-weight: 900; letter-spacing: .14em; }
 .map-status b { margin-left: auto; color: rgba(255,255,255,.58); font-weight: 600; letter-spacing: .08em; }
+.map-selection-total { position: absolute; z-index: 7; top: 43px; left: 16px; display: flex; align-items: center; gap: 12px; padding: 9px 12px; border: 1px solid rgba(255,255,255,.22); border-radius: 11px; background: rgba(5,31,61,.84); color: white; opacity: 0; transform: translateY(-5px); pointer-events: none; transition: opacity .18s, transform .18s; backdrop-filter: blur(8px); }
+.map-selection-total.is-visible { opacity: 1; transform: translateY(0); }
+.map-selection-total span { color: rgba(255,255,255,.65); font-size: 8px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.map-selection-total strong { color: var(--yellow); font-size: 15px; }
 .pulse { width: 7px; height: 7px; border-radius: 50%; background: #56f0a8; box-shadow: 0 0 0 4px rgba(86,240,168,.14); animation: pulse 1.8s infinite; }
 @keyframes pulse { 50% { box-shadow: 0 0 0 8px rgba(86,240,168,0); } }
 .map-wrap { position: absolute; inset: 24px 0 34px; overflow: hidden; }
