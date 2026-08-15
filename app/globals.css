@@ -26,8 +26,15 @@ a { color: inherit; text-decoration: none; }
 @keyframes oceanDrift { to { transform: rotate(45deg) translate(20px, -16px); } }
 
 .site-header { height: 82px; position: sticky; top: 0; z-index: 30; padding: 0 clamp(24px, 5vw, 82px); display: flex; align-items: center; color: white; border-bottom: 1px solid var(--line); background: rgba(18,118,184,.62); backdrop-filter: blur(15px); }
-.brand { display: flex; align-items: flex-start; font-weight: 900; letter-spacing: -4px; font-size: 35px; line-height: 1; }
-.brand sup { font-size: .55em; margin: -3px 0 0 2px; letter-spacing: 0; }
+.brand { display: flex; align-items: center; }
+.pixeluk-logo { display: inline-flex; align-items: flex-end; position: relative; color: white; font-size: 31px; font-weight: 900; line-height: .8; letter-spacing: -.08em; }
+.logo-pixels { position: relative; width: .65em; height: .82em; margin-right: .08em; flex: 0 0 auto; }
+.logo-pixels i { position: absolute; width: .34em; height: .34em; background: linear-gradient(135deg, #744dff, #f04dad); image-rendering: pixelated; }
+.logo-pixels i:nth-child(1) { left: 0; bottom: 0; }
+.logo-pixels i:nth-child(2) { left: .31em; bottom: .31em; width: .52em; height: .52em; }
+.logo-pixels i:nth-child(3) { left: .73em; bottom: .73em; width: .17em; height: .17em; }
+.logo-pixel { font-family: "Courier New", Courier, monospace; font-weight: 900; transform: scaleX(.92); transform-origin: right bottom; text-shadow: 1px 0 currentColor; }
+.logo-uk { margin-left: .1em; padding-left: .13em; border-left: .1em solid #ffcb3d; color: #ffcb3d; font-family: Arial Black, Arial, sans-serif; font-size: .87em; letter-spacing: -.11em; }
 .site-header nav { position: absolute; left: 50%; transform: translateX(-50%); display: flex; gap: 34px; font-size: 13px; font-weight: 700; }
 .site-header nav a { padding: 9px 7px; position: relative; border-radius: 8px; }
 .site-header nav a::after { content: ""; position: absolute; height: 2px; bottom: 0; left: 0; right: 100%; background: white; transition: right .25s ease; }
@@ -118,7 +125,7 @@ h1 em, h2 em { color: var(--yellow); font-family: Georgia, serif; font-weight: 4
 .benefit-grid article:hover span, .benefit-grid article:focus-within span, .benefit-grid article:hover p, .benefit-grid article:focus-within p { color: var(--deep); }
 
 footer { background: #03162c; color: white; padding: 58px clamp(24px, 7vw, 110px) 28px; display: grid; grid-template-columns: auto 1fr auto; gap: 30px; align-items: center; }
-.footer-brand { font-size: 45px; }
+.footer-brand { font-size: 39px; }
 footer > p { color: rgba(255,255,255,.56); font-family: Georgia, serif; font-style: italic; }
 footer > div:nth-child(3) { display: flex; gap: 25px; font-size: 11px; font-weight: 800; text-transform: uppercase; }
 footer small { grid-column: 1/-1; padding-top: 25px; border-top: 1px solid rgba(255,255,255,.12); color: rgba(255,255,255,.4); font-size: 9px; letter-spacing: .09em; text-transform: uppercase; }
@@ -168,7 +175,7 @@ footer small { grid-column: 1/-1; padding-top: 25px; border-top: 1px solid rgba(
 }
 
 @media (max-width: 760px) {
-  .site-header { height: 68px; padding: 0 19px; }.brand { font-size: 30px; }
+  .site-header { height: 68px; padding: 0 19px; }.pixeluk-logo { font-size: 27px; }
   .menu-button { display: block; margin-left: auto; border: 1px solid rgba(255,255,255,.5); background: none; color: white; padding: 8px 11px; font-size: 10px; text-transform: uppercase; }
   .site-header nav { display: none; left: 12px; right: 12px; top: 61px; transform: none; background: var(--deep); padding: 16px; gap: 9px; box-shadow: 0 15px 30px rgba(0,0,0,.2); }.site-header nav.is-open { display: flex; }.site-header nav a { flex: 1; text-align: center; }
   .header-cta { display: none; }

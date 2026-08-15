@@ -5,7 +5,7 @@ import "../app/globals.css";
 
 const root = document.getElementById("root");
 
-if (!root) throw new Error("UK² could not find its page root.");
+if (!root) throw new Error("pixelUK could not find its page root.");
 
 createRoot(root).render(
   <StrictMode>

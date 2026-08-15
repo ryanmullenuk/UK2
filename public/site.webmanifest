@@ -1,18 +1,18 @@
 {
-  "name": "UK² — Claim your place on the map",
-  "short_name": "UK²",
-  "start_url": "/UK2/",
+  "name": "pixelUK — Claim your place on the map",
+  "short_name": "pixelUK",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#08294e",
   "theme_color": "#1174bd",
   "icons": [
     {
-      "src": "/UK2/apple-touch-icon.png",
+      "src": "/apple-touch-icon.png",
       "sizes": "180x180",
       "type": "image/png"
     },
     {
-      "src": "/UK2/icon-512.png",
+      "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png"
     }

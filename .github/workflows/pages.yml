@@ -1,4 +1,4 @@
-name: Deploy UK2 to GitHub Pages
+name: Deploy pixelUK to GitHub Pages
 
 on:
   push:

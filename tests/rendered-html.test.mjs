@@ -5,13 +5,14 @@ import test from "node:test";
 test("builds a public GitHub Pages entry point", async () => {
   const html = await readFile(new URL("../dist/index.html", import.meta.url), "utf8");
 
-  assert.match(html, /<title>UK² — Claim your place on the map<\/title>/i);
+  assert.match(html, /<title>pixelUK — Claim your place on the map<\/title>/i);
   assert.match(html, /<div id="root"><\/div>/i);
-  assert.match(html, /\/UK2\/assets\/[^"']+\.js/i);
-  assert.match(html, /https:\/\/ryanmullenuk\.github\.io\/UK2\/og\.png/i);
-  assert.match(html, /\/UK2\/apple-touch-icon\.png/i);
-  assert.match(html, /\/UK2\/site\.webmanifest/i);
+  assert.match(html, /\/assets\/[^"']+\.js/i);
+  assert.match(html, /https:\/\/pixeluk\.co\.uk\/og\.png/i);
+  assert.match(html, /\/apple-touch-icon\.png/i);
+  assert.match(html, /\/site\.webmanifest/i);
   assert.doesNotMatch(html, /chatgpt|sign[ -]?in|auth/i);
+  assert.equal((await readFile(new URL("../dist/CNAME", import.meta.url), "utf8")).trim(), "pixeluk.co.uk");
 });
 
 test("keeps the exact-count and accessibility safeguards", async () => {

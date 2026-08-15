@@ -1,4 +1,4 @@
-# UK²
+# pixelUK
 
 An interactive digital map of the United Kingdom made from exactly 10,000 individually selectable squares.
 
@@ -34,7 +34,7 @@ pnpm run build
 
 The site is a static React application hosted entirely by GitHub Pages. It has no sign-in, ChatGPT hosting or external application layer.
 
-The repository includes a GitHub Actions workflow for GitHub Pages. In the repository settings, set **Pages → Build and deployment → Source** to **GitHub Actions**. Each push to `main` then publishes the latest version at [ryanmullenuk.github.io/UK2](https://ryanmullenuk.github.io/UK2/).
+The repository includes a GitHub Actions workflow for GitHub Pages. Each push to `main` publishes the latest version at [pixeluk.co.uk](https://pixeluk.co.uk/). The `public/CNAME` file preserves the custom-domain setting during deployment.
 
 ## Connecting the live purchase flow
 

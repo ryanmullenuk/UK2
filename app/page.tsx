@@ -17,7 +17,16 @@ function buildPixels(): Pixel[] {
 }
 
 const PIXELS = buildPixels();
-if (PIXELS.length !== TOTAL_PIXELS) throw new Error(`UK² map must contain exactly ${TOTAL_PIXELS} squares; generated ${PIXELS.length}.`);
+if (PIXELS.length !== TOTAL_PIXELS) throw new Error(`pixelUK map must contain exactly ${TOTAL_PIXELS} squares; generated ${PIXELS.length}.`);
+
+function PixelUkLogo({ footer = false }: { footer?: boolean }) {
+  return (
+    <span className={`pixeluk-logo${footer ? " footer-brand" : ""}`} aria-hidden="true">
+      <span className="logo-pixels"><i /><i /><i /></span>
+      <span className="logo-pixel">pixel</span><span className="logo-uk">UK</span>
+    </span>
+  );
+}
 const AVAILABLE_PIXELS = PIXELS.filter((pixel) => !pixel.owner).length;
 const PIXEL_LOOKUP = new Map(PIXELS.map((p) => [`${p.x}:${p.y}`, p]));
 const RIPPLE_CELLS = (() => {
@@ -366,7 +375,7 @@ export default function Home() {
     <main>
       <div className="ocean" aria-hidden="true"><div /><div /><div /></div>
       <header className="site-header">
-        <a className="brand" href="#home" aria-label="UK squared home"><span>UK</span><sup>2</sup></a>
+        <a className="brand" href="#home" aria-label="pixelUK home"><PixelUkLogo /></a>
         <button className="menu-button" aria-expanded={menuOpen} aria-controls="site-nav" onClick={() => setMenuOpen(!menuOpen)}>MENU</button>
         <nav id="site-nav" className={menuOpen ? "is-open" : ""} aria-label="Main navigation">
           <a href="#home" onClick={() => setMenuOpen(false)}>HOME</a>
@@ -380,7 +389,7 @@ export default function Home() {
         <div className="hero-copy">
           <p className="eyebrow"><span /> The digital land grab</p>
           <h1>CLAIM YOUR PLACE<br />ON THE <em>MAP.</em></h1>
-          <p className="intro">10,000 squares. One iconic island. Own a permanent piece of the UK² map and make your mark.</p>
+          <p className="intro">10,000 squares. One iconic island. Own a permanent piece of the pixelUK map and make your mark.</p>
           <div className="hero-actions">
             <button className="primary" onClick={() => document.querySelector(".pixel-map")?.scrollIntoView({ behavior: "smooth", block: "center" })}>Choose your squares</button>
             <a href="#about">How it works</a>
@@ -402,7 +411,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="ticker" aria-label="How UK squared works">
+      <section className="ticker" aria-label="How pixelUK works">
         <div>CHOOSE YOUR SQUARES <span>|</span> PICK YOUR COLOUR <span>|</span> ADD YOUR LINK <span>|</span> STAY ON THE MAP <span>|</span> CHOOSE YOUR SQUARES <span>|</span></div>
       </section>
 
@@ -411,7 +420,7 @@ export default function Home() {
         <div className="section-copy">
           <p className="eyebrow dark"><span /> One map. 10,000 stories.</p>
           <h2>A small square<br />with <em>big potential.</em></h2>
-          <p>UK² is a living, clickable portrait of Britain, owned one square at a time by the people, brands and ideas shaping it.</p>
+          <p>pixelUK is a living, clickable portrait of Britain, owned one square at a time by the people, brands and ideas shaping it.</p>
         </div>
         <div className="steps">
           <article><b>01</b><h3>Choose</h3><p>Pick one square, a cluster, or plot out a pattern anywhere that is still available.</p></article>
@@ -436,10 +445,10 @@ export default function Home() {
       </section>
 
       <footer>
-        <div className="brand footer-brand"><span>UK</span><sup>2</sup></div>
+        <PixelUkLogo footer />
         <p>Claim your place on the map.</p>
-        <div><a href="#about">About</a><a href="#why-buy">Why buy</a><a href="mailto:hello@uk2.example">Contact</a></div>
-        <small>© 2026 UK² · Prototype purchase experience</small>
+        <div><a href="#about">About</a><a href="#why-buy">Why buy</a><a href="mailto:hello@pixeluk.co.uk">Contact</a></div>
+        <small>© 2026 pixelUK · Prototype purchase experience</small>
       </footer>
 
       {selected.size > 0 && (
