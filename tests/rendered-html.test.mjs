@@ -32,7 +32,10 @@ test("keeps the exact-count and accessibility safeguards", async () => {
   assert.equal(JSON.parse(packedMask).split(" ").length, 10_000);
   assert.match(page, /aria-label=\{`Interactive UK map containing exactly/);
   assert.match(page, /Proceed to secure payment/);
-  assert.match(page, /const AVAILABLE_PIXELS = PIXELS\.filter\(\(pixel\) => !pixel\.owner\)\.length/);
+  assert.match(page, /const \[availablePixels, setAvailablePixels\] = useState\(TOTAL_PIXELS\)/);
+  assert.match(page, /\/map-data/);
+  assert.match(page, /\/create-checkout/);
+  assert.match(page, /Stripe is currently in test mode/);
   assert.doesNotMatch(page, /mockOwner|const OWNERS/);
   assert.doesNotMatch(page, /[↗↓✦]/);
   assert.match(page, /className="zoom-controls"/);
@@ -55,4 +58,25 @@ test("keeps the exact-count and accessibility safeguards", async () => {
   assert.match(css, /\.purchase-modal \{ border: 0; box-shadow: none; \}/);
   assert.doesNotMatch(packageJson, /vinext|wrangler|cloudflare|drizzle|next/i);
   assert.match(workflow, /path: dist\s*$/m);
+});
+
+test("keeps checkout secrets server-side and ownership transactional", async () => {
+  const [page, migration, checkout, webhook, mapData] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../supabase/migrations/20260816000000_pixel_ownership.sql", import.meta.url), "utf8"),
+    readFile(new URL("../supabase/functions/create-checkout/index.ts", import.meta.url), "utf8"),
+    readFile(new URL("../supabase/functions/stripe-webhook/index.ts", import.meta.url), "utf8"),
+    readFile(new URL("../supabase/functions/map-data/index.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.doesNotMatch(page, /sk_(?:test|live)_|whsec_/);
+  assert.match(migration, /generate_series\(1, 10000\)/);
+  assert.match(migration, /for update/);
+  assert.match(migration, /status = 'owned'/);
+  assert.match(migration, /enable row level security/);
+  assert.match(checkout, /stripe\.checkout\.sessions\.create/);
+  assert.match(checkout, /unit_amount: 200/);
+  assert.match(webhook, /constructEventAsync/);
+  assert.match(webhook, /complete_pixel_order/);
+  assert.match(mapData, /\.eq\("status", "available"\)/);
 });

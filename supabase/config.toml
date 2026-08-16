@@ -1,0 +1,10 @@
+project_id = "fgtokfjsasxflyxpiwif"
+
+[functions.map-data]
+verify_jwt = false
+
+[functions.create-checkout]
+verify_jwt = false
+
+[functions.stripe-webhook]
+verify_jwt = false

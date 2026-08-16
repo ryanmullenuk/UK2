@@ -9,8 +9,8 @@ An interactive digital map of the United Kingdom made from exactly 10,000 indivi
 - Pointer hover, click, tap and drag selection
 - Multiple-square selection and live pricing
 - Colour choice for patterns, initials and pixel art
-- Buyer profile, advertisement and outbound-link display states ready for live ownership data
-- Checkout review screen ready to hand off to a secure payment and ownership service
+- Permanent Supabase ownership records with public buyer profile, advertisement and outbound-link display states
+- Stripe Checkout with transactional 30-minute square reservations and signed webhook fulfilment
 - Responsive layouts and reduced-motion support
 
 ## Local setup
@@ -32,25 +32,35 @@ pnpm run build
 
 ## Deployment
 
-The site is a static React application hosted entirely by GitHub Pages. It has no sign-in, ChatGPT hosting or external application layer.
+The public site is a static React application hosted by GitHub Pages. Supabase provides the database and server-side functions used for availability, reservations and ownership. Stripe hosts the secure payment screen. There is no ChatGPT hosting or sign-in layer.
 
 The repository includes a GitHub Actions workflow for GitHub Pages. Each push to `main` publishes the latest version at [pixeluk.co.uk](https://pixeluk.co.uk/). The `public/CNAME` file preserves the custom-domain setting during deployment.
 
-## Connecting the live purchase flow
+## Purchase infrastructure
 
-All 10,000 squares currently start available. Permanent sales require a server-side ownership service; payment keys and purchase enforcement must not be placed in the GitHub Pages front end.
+The checked-in `supabase` directory contains the database migration and three Edge Functions:
 
-Recommended production flow:
+- `map-data` returns public owner details and the live available count.
+- `create-checkout` reserves selected squares atomically and creates the Stripe Checkout Session.
+- `stripe-webhook` verifies Stripe's signature and permanently assigns paid squares.
 
-1. Store one database row per square, keyed by the existing pixel ID, with `available`, `reserved` and `owned` states.
-2. When checkout starts, call a server-side function that reserves every requested ID in one database transaction. A unique primary key and conditional update prevent overlapping orders.
-3. Give reservations a short expiry so abandoned checkouts return their squares to sale.
-4. Create a one-time [Stripe Checkout Session](https://docs.stripe.com/payments/checkout) on the server and attach the reservation or order ID as metadata.
-5. Redirect the buyer to Stripe's hosted payment page. Never expose the Stripe secret key in this repository or browser code.
-6. Verify Stripe's signed `checkout.session.completed` webhook, then atomically change the reserved rows to `owned` and store their permanent colour, owner profile, advert and link.
-7. Load public ownership rows when the map opens and subscribe to database changes so sold squares update for every visitor.
+Apply the migration and deploy the functions with the Supabase CLI:
 
-[Supabase Edge Functions](https://supabase.com/docs/guides/functions) are a suitable server-side layer for creating Checkout Sessions and receiving signed Stripe webhooks. Any public database tables should have Row Level Security enabled, with browser access limited to safe ownership reads.
+```bash
+supabase link --project-ref fgtokfjsasxflyxpiwif
+supabase db push
+supabase functions deploy map-data --no-verify-jwt
+supabase functions deploy create-checkout --no-verify-jwt
+supabase functions deploy stripe-webhook --no-verify-jwt
+```
+
+Set `SITE_URL`, `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` as encrypted Supabase Edge Function secrets. Never place Stripe secret keys in GitHub or browser code. Configure Stripe to send `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed` and `checkout.session.expired` to:
+
+```text
+https://fgtokfjsasxflyxpiwif.supabase.co/functions/v1/stripe-webhook
+```
+
+Stripe is currently expected to be in test mode. Complete and verify a test purchase before replacing the test key and webhook endpoint with live-mode credentials.
 
 ## Map data note
 

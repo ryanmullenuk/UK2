@@ -11,7 +11,7 @@
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 body { margin: 0; color: var(--ink); background: var(--blue); font-family: Arial, Helvetica, sans-serif; overflow-x: hidden; }
-button, input { font: inherit; }
+button, input, textarea { font: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }
 button { color: inherit; border-radius: 10px; }
 a { color: inherit; text-decoration: none; }
@@ -42,6 +42,9 @@ a { color: inherit; text-decoration: none; }
 .header-cta { margin-left: auto; padding: 11px 18px; border: 1px solid rgba(255,255,255,.6); border-radius: 12px; background: transparent; color: white; cursor: pointer; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; transition: .2s; }
 .header-cta:hover { background: white; color: var(--ink); }
 .menu-button { display: none; }
+.site-notice { position: fixed; z-index: 55; top: 94px; left: 50%; transform: translateX(-50%); width: min(680px, calc(100% - 30px)); display: flex; align-items: center; gap: 18px; padding: 13px 15px 13px 18px; border: 1px solid rgba(255,255,255,.3); border-radius: 14px; background: rgba(5,31,61,.95); color: white; font-size: 12px; line-height: 1.45; backdrop-filter: blur(10px); }
+.site-notice span { flex: 1; }
+.site-notice button { border: 1px solid rgba(255,255,255,.35); background: transparent; color: white; padding: 7px 10px; cursor: pointer; font-size: 9px; text-transform: uppercase; }
 
 .hero { min-height: calc(100vh - 82px); max-width: 1540px; margin: 0 auto; padding: clamp(46px, 6vw, 92px) clamp(24px, 5vw, 82px) 40px; display: grid; grid-template-columns: minmax(410px, .78fr) minmax(480px, 1.22fr); gap: clamp(34px, 6vw, 100px); align-items: center; color: white; }
 .hero-copy { padding-bottom: 14px; }
@@ -157,14 +160,17 @@ footer small { grid-column: 1/-1; padding-top: 25px; border-top: 1px solid rgba(
 .modal-link { display: inline-block; margin-top: 12px; }
 .purchase-note { padding-bottom: 18px; border-bottom: 1px solid #ccd3ce; }
 .purchase-modal label { display: block; margin: 16px 0; font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; }
-.purchase-modal input { display: block; width: 100%; margin-top: 7px; border: 1px solid #aebcb5; border-radius: 10px; background: white; padding: 13px; color: var(--ink); }
+.purchase-modal input, .purchase-modal textarea { display: block; width: 100%; margin-top: 7px; border: 1px solid #aebcb5; border-radius: 10px; background: white; padding: 13px; color: var(--ink); resize: vertical; }
 .purchase-selection { display: flex; align-items: center; gap: 13px; padding: 13px; border: 1px solid #ccd3ce; border-radius: 13px; background: white; }
 .purchase-colour { flex: 0 0 42px; width: 42px; height: 42px; border: 2px solid var(--deep); border-radius: 10px; }
 .purchase-selection p { display: flex; flex-direction: column; gap: 4px; margin: 0; min-width: 0; }
 .purchase-selection strong { font-size: 11px; }.purchase-selection small { overflow: hidden; color: #65798b; font-size: 9px; line-height: 1.4; }
 .purchase-summary { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #ccd3ce; margin-top: 22px; padding-top: 18px; }.purchase-summary span { font-size: 12px; color: #65798b; }.purchase-summary strong { font-size: 26px; }
 .purchase-button { margin-top: 20px; width: 100%; }
+.purchase-button:disabled { opacity: .55; cursor: wait; }
 .purchase-modal .purchase-button, .owner-modal .primary { border-color: #c89500; color: var(--deep); }
+.checkout-error { margin: 12px 0 0; padding: 11px 13px; border-radius: 10px; background: #ffe1e1; color: #8b1722 !important; font-size: 12px; }
+.sandbox-note { display: block; margin: 11px 0 0; color: #65798b; font-size: 9px; line-height: 1.45; text-align: center; }
 
 :focus-visible { outline: 3px solid var(--yellow); outline-offset: 3px; }
 
@@ -176,6 +182,7 @@ footer small { grid-column: 1/-1; padding-top: 25px; border-top: 1px solid rgba(
 
 @media (max-width: 760px) {
   .site-header { height: 68px; padding: 0 19px; }.pixeluk-logo { font-size: 27px; }
+  .site-notice { top: 78px; }
   .menu-button { display: block; margin-left: auto; border: 1px solid rgba(255,255,255,.5); background: none; color: white; padding: 8px 11px; font-size: 10px; text-transform: uppercase; }
   .site-header nav { display: none; left: 12px; right: 12px; top: 61px; transform: none; background: var(--deep); padding: 16px; gap: 9px; box-shadow: 0 15px 30px rgba(0,0,0,.2); }.site-header nav.is-open { display: flex; }.site-header nav a { flex: 1; text-align: center; }
   .header-cta { display: none; }

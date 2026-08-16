@@ -3,11 +3,13 @@ import { UK_GRID_HEIGHT, UK_GRID_WIDTH, UK_MASK_PACKED } from "./generated-uk-ma
 
 type Pixel = { id: number; x: number; y: number; owner?: Owner };
 type Owner = { name: string; colour: string; title: string; link: string; note: string };
+type CheckoutForm = { ownerName: string; buyerEmail: string; ownerTitle: string; ownerNote: string; ownerLink: string };
 
 const GRID_W = UK_GRID_WIDTH;
 const GRID_H = UK_GRID_HEIGHT;
 const TOTAL_PIXELS = 10_000;
 const PRICE = 2;
+const FUNCTIONS_URL = "https://fgtokfjsasxflyxpiwif.supabase.co/functions/v1";
 
 function buildPixels(): Pixel[] {
   return UK_MASK_PACKED.split(" ").map((cell, index) => {
@@ -27,7 +29,6 @@ function PixelUkLogo({ footer = false }: { footer?: boolean }) {
     </span>
   );
 }
-const AVAILABLE_PIXELS = PIXELS.filter((pixel) => !pixel.owner).length;
 const PIXEL_LOOKUP = new Map(PIXELS.map((p) => [`${p.x}:${p.y}`, p]));
 const RIPPLE_CELLS = (() => {
   const land = new Set(PIXELS.map((pixel) => `${pixel.x}:${pixel.y}`));
@@ -65,9 +66,10 @@ function formatNumber(value: number) {
   return new Intl.NumberFormat("en-GB").format(value);
 }
 
-function PixelMap({ selected, colour, onToggle, onOpenOwner }: {
+function PixelMap({ selected, colour, owners, onToggle, onOpenOwner }: {
   selected: Set<number>;
   colour: string;
+  owners: Map<number, Owner>;
   onToggle: (pixel: Pixel, add?: boolean) => void;
   onOpenOwner: (pixel: Pixel) => void;
 }) {
@@ -99,12 +101,16 @@ function PixelMap({ selected, colour, onToggle, onOpenOwner }: {
     if (!context) return cache;
     context.imageSmoothingEnabled = false;
     for (const pixel of PIXELS) {
-      context.fillStyle = pixel.owner?.colour || "#e8f2ef";
+      context.fillStyle = owners.get(pixel.id)?.colour || "#e8f2ef";
       context.fillRect(pixel.x * scale, pixel.y * scale, scale - .65, scale - .65);
     }
     mapCacheRef.current = cache;
     return cache;
-  }, []);
+  }, [owners]);
+
+  useEffect(() => {
+    mapCacheRef.current = null;
+  }, [owners]);
 
   const clampPan = useCallback((next: { x: number; y: number }, level = zoom) => {
     const { baseCell, width, height } = metricsRef.current;
@@ -272,7 +278,8 @@ function PixelMap({ selected, colour, onToggle, onOpenOwner }: {
     const cell = Number(canvas.dataset.cell);
     const x = Math.floor((clientX - rect.left - Number(canvas.dataset.ox)) / cell);
     const y = Math.floor((clientY - rect.top - Number(canvas.dataset.oy)) / cell);
-    return PIXEL_LOOKUP.get(`${x}:${y}`) || null;
+    const pixel = PIXEL_LOOKUP.get(`${x}:${y}`);
+    return pixel ? { ...pixel, owner: owners.get(pixel.id) } : null;
   };
 
   const handleMove = (event: React.PointerEvent) => {
@@ -357,11 +364,57 @@ function PixelMap({ selected, colour, onToggle, onOpenOwner }: {
 export default function Home() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [colour, setColour] = useState("#ffcb3d");
+  const [owners, setOwners] = useState<Map<number, Owner>>(new Map());
+  const [availablePixels, setAvailablePixels] = useState(TOTAL_PIXELS);
   const [ownerPixel, setOwnerPixel] = useState<Pixel | null>(null);
   const [purchaseOpen, setPurchaseOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [mapNotice, setMapNotice] = useState("");
+  const [checkoutError, setCheckoutError] = useState("");
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutForm, setCheckoutForm] = useState<CheckoutForm>({ ownerName: "", buyerEmail: "", ownerTitle: "", ownerNote: "", ownerLink: "" });
+
+  const loadMap = useCallback(async () => {
+    try {
+      const response = await fetch(`${FUNCTIONS_URL}/map-data`, { headers: { Accept: "application/json" } });
+      if (!response.ok) throw new Error("Map request failed");
+      const data = await response.json() as { available: number; owned: Array<{ id: number; colour: string; owner_name: string; owner_title: string; owner_note: string; owner_link: string }> };
+      const nextOwners = new Map<number, Owner>();
+      for (const pixel of data.owned || []) {
+        nextOwners.set(pixel.id, {
+          name: pixel.owner_name,
+          colour: pixel.colour,
+          title: pixel.owner_title,
+          note: pixel.owner_note,
+          link: pixel.owner_link,
+        });
+      }
+      setOwners(nextOwners);
+      setAvailablePixels(data.available);
+      setSelected((current) => new Set([...current].filter((id) => !nextOwners.has(id))));
+    } catch {
+      setMapNotice((current) => current || "Live ownership data is temporarily unavailable. Please refresh before choosing squares.");
+    }
+  }, []);
+
+  useEffect(() => {
+    const query = new URLSearchParams(window.location.search);
+    const payment = query.get("payment");
+    if (payment === "success") {
+      setMapNotice("Payment received. Your squares are being added permanently to the map.");
+      setSelected(new Set());
+      window.setTimeout(loadMap, 800);
+      window.setTimeout(loadMap, 3000);
+      window.history.replaceState({}, "", `${window.location.pathname}${window.location.hash}`);
+    } else if (payment === "cancelled") {
+      setMapNotice("Checkout was cancelled. Reserved squares become available again when the checkout session expires.");
+      window.history.replaceState({}, "", `${window.location.pathname}${window.location.hash}`);
+    }
+    loadMap();
+  }, [loadMap]);
 
   const togglePixel = useCallback((pixel: Pixel, add = false) => {
+    if (owners.has(pixel.id)) return;
     setSelected((current) => {
       const next = new Set(current);
       if (add) next.add(pixel.id);
@@ -369,7 +422,34 @@ export default function Home() {
       else next.add(pixel.id);
       return next;
     });
-  }, []);
+  }, [owners]);
+
+  const updateCheckoutField = (field: keyof CheckoutForm, value: string) => {
+    setCheckoutForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const startCheckout = async () => {
+    setCheckoutError("");
+    if (!checkoutForm.ownerName.trim() || !checkoutForm.buyerEmail.trim()) {
+      setCheckoutError("Enter your name or brand and email address.");
+      return;
+    }
+    setCheckoutLoading(true);
+    try {
+      const response = await fetch(`${FUNCTIONS_URL}/create-checkout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pixelIds: [...selected], colour, ...checkoutForm }),
+      });
+      const data = await response.json() as { url?: string; error?: string };
+      if (!response.ok || !data.url) throw new Error(data.error || "Checkout could not be started.");
+      window.location.assign(data.url);
+    } catch (error) {
+      setCheckoutError(error instanceof Error ? error.message : "Checkout could not be started.");
+      await loadMap();
+      setCheckoutLoading(false);
+    }
+  };
 
   return (
     <main>
@@ -385,6 +465,8 @@ export default function Home() {
         <button className="header-cta" onClick={() => document.querySelector(".pixel-map")?.scrollIntoView({ behavior: "smooth", block: "center" })}>Claim squares</button>
       </header>
 
+      {mapNotice && <div className="site-notice" role="status"><span>{mapNotice}</span><button type="button" onClick={() => setMapNotice("")}>Close</button></div>}
+
       <section className="hero" id="home">
         <div className="hero-copy">
           <p className="eyebrow"><span /> The digital land grab</p>
@@ -395,7 +477,7 @@ export default function Home() {
             <a href="#about">How it works</a>
           </div>
           <div className="live-stats">
-            <div><strong>{formatNumber(AVAILABLE_PIXELS)}</strong><span>Squares available</span></div>
+            <div><strong>{formatNumber(availablePixels)}</strong><span>Squares available</span></div>
             <div><strong>£{PRICE}</strong><span>Per square</span></div>
             <div><strong>Forever</strong><span>On the map</span></div>
           </div>
@@ -406,7 +488,7 @@ export default function Home() {
           <div className={`map-selection-total ${selected.size ? "is-visible" : ""}`} aria-live="polite">
             <span>{selected.size} selected</span><strong>£{selected.size * PRICE}</strong>
           </div>
-          <PixelMap selected={selected} colour={colour} onToggle={togglePixel} onOpenOwner={setOwnerPixel} />
+          <PixelMap selected={selected} colour={colour} owners={owners} onToggle={togglePixel} onOpenOwner={setOwnerPixel} />
           <p className="map-instruction">Hover to explore · Scroll or use controls to zoom · Drag the ocean to move</p>
         </div>
       </section>
@@ -448,7 +530,7 @@ export default function Home() {
         <PixelUkLogo footer />
         <p>Claim your place on the map.</p>
         <div><a href="#about">About</a><a href="#why-buy">Why buy</a><a href="mailto:hello@pixeluk.co.uk">Contact</a></div>
-        <small>© 2026 pixelUK · Prototype purchase experience</small>
+        <small>© 2026 pixelUK · Secure checkout powered by Stripe</small>
       </footer>
 
       {selected.size > 0 && (
@@ -476,7 +558,7 @@ export default function Home() {
             <h2 id="owner-title">{ownerPixel.owner.name}</h2>
             <h3>{ownerPixel.owner.title}</h3>
             <p>{ownerPixel.owner.note}</p>
-            <a className="primary modal-link" href={ownerPixel.owner.link} target="_blank" rel="noreferrer">Visit their page</a>
+            {ownerPixel.owner.link && <a className="primary modal-link" href={ownerPixel.owner.link} target="_blank" rel="noreferrer">Visit their page</a>}
           </section>
         </div>
       )}
@@ -487,17 +569,20 @@ export default function Home() {
             <button className="modal-close" onClick={() => setPurchaseOpen(false)}>Close</button>
             <p className="eyebrow dark"><span /> Secure checkout</p>
             <h2 id="purchase-title">Your {selected.size === 1 ? "square" : `${selected.size} squares`}</h2>
-            <p className="purchase-note">Review your selection and advert details. The final button will connect to Stripe Checkout when the secure ownership service is enabled.</p>
+            <p className="purchase-note">Your selection will be reserved for 30 minutes while you complete secure payment through Stripe.</p>
             <div className="purchase-selection">
               <span className="purchase-colour" style={{ background: colour }} />
               <p><strong>Selected squares</strong><small>{Array.from(selected).slice(0, 8).map((id) => `#${id}`).join(", ")}{selected.size > 8 ? ` and ${selected.size - 8} more` : ""}</small></p>
             </div>
-            <label>Your name or brand<input type="text" placeholder="e.g. North Star Studio" /></label>
-            <label>Email address<input type="email" placeholder="you@example.com" /></label>
-            <label>Headline<input type="text" placeholder="A short line visitors will see" /></label>
-            <label>Destination link<input type="url" placeholder="https://" /></label>
+            <label>Your name or brand<input type="text" maxLength={80} autoComplete="name" value={checkoutForm.ownerName} onChange={(event) => updateCheckoutField("ownerName", event.target.value)} placeholder="e.g. North Star Studio" /></label>
+            <label>Email address<input type="email" maxLength={254} autoComplete="email" value={checkoutForm.buyerEmail} onChange={(event) => updateCheckoutField("buyerEmail", event.target.value)} placeholder="you@example.com" /></label>
+            <label>Headline<input type="text" maxLength={120} value={checkoutForm.ownerTitle} onChange={(event) => updateCheckoutField("ownerTitle", event.target.value)} placeholder="A short line visitors will see" /></label>
+            <label>Story, advert or dedication<textarea maxLength={500} rows={4} value={checkoutForm.ownerNote} onChange={(event) => updateCheckoutField("ownerNote", event.target.value)} placeholder="Tell visitors what this place means or what you want them to discover" /></label>
+            <label>Destination link<input type="url" maxLength={300} value={checkoutForm.ownerLink} onChange={(event) => updateCheckoutField("ownerLink", event.target.value)} placeholder="https://" /></label>
+            {checkoutError && <p className="checkout-error" role="alert">{checkoutError}</p>}
             <div className="purchase-summary"><span>{selected.size} × £{PRICE}</span><strong>£{selected.size * PRICE}</strong></div>
-            <button className="primary purchase-button" onClick={() => alert("Secure payment will be enabled when Stripe and the permanent ownership database are connected.")}>Proceed to secure payment</button>
+            <button className="primary purchase-button" type="button" disabled={checkoutLoading || selected.size === 0} onClick={startCheckout}>{checkoutLoading ? "Reserving your squares…" : "Proceed to secure payment"}</button>
+            <small className="sandbox-note">Stripe is currently in test mode. No real payment will be taken until the account is switched to live mode.</small>
           </section>
         </div>
       )}
